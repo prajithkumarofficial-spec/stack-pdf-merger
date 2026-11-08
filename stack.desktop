@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Stack PDF Merger
+Comment=Merge PDFs locally on your device
+Exec=stack-pdf-merger
+Icon=application-pdf
+Terminal=false
+Categories=Office;Utility;
+MimeType=application/pdf;
