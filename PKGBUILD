@@ -1,10 +1,10 @@
 pkgname=stack-pdf-merger
-pkgver=1.0.2
+pkgver=1.1.0
 pkgrel=1
-pkgdesc='A local desktop app for merging PDF files'
+pkgdesc='A local desktop workbench for merging and editing PDF files'
 arch=('any')
 license=('custom:MIT')
-depends=('python' 'pyside6' 'poppler')
+depends=('python' 'pyside6' 'python-pypdf' 'python-cryptography')
 source=('app.py' 'stack.desktop' 'LICENSE' 'icon.svg')
 sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
 

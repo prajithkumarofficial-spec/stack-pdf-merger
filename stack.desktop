@@ -1,7 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Stack PDF Merger
-Comment=Merge PDFs locally on your device
+Name=Stack PDF Workbench
+GenericName=PDF Workbench
+Comment=Merge, split, rotate, optimize, and protect PDFs locally
 Exec=stack-pdf-merger
 Icon=stack-pdf-merger
 Terminal=false
