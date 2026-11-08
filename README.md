@@ -2,6 +2,8 @@
 
 Stack PDF Merger is a native Arch Linux desktop app for joining PDFs in the order you choose. It does not run a web server and it does not upload files.
 
+The custom Stack icon and dark violet theme keep the app easy to spot in your desktop and window switcher. Merging runs in a background worker, so large documents do not freeze the window.
+
 ## Run it on Arch Linux
 
 Install the desktop dependencies, then launch the app:

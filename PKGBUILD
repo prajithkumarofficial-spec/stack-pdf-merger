@@ -1,15 +1,17 @@
 pkgname=stack-pdf-merger
-pkgver=1.0.1
+pkgver=1.0.2
 pkgrel=1
 pkgdesc='A local desktop app for merging PDF files'
 arch=('any')
 license=('custom:MIT')
 depends=('python' 'pyside6' 'poppler')
-source=('app.py' 'stack.desktop' 'LICENSE')
-sha256sums=('SKIP' 'SKIP' 'SKIP')
+source=('app.py' 'stack.desktop' 'LICENSE' 'icon.svg')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
   install -Dm755 "$srcdir/app.py" "$pkgdir/usr/share/stack-pdf-merger/app.py"
+  install -Dm644 "$srcdir/icon.svg" "$pkgdir/usr/share/stack-pdf-merger/icon.svg"
+  install -Dm644 "$srcdir/icon.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/stack-pdf-merger.svg"
   install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/stack-pdf-merger/LICENSE"
   install -Dm644 "$srcdir/stack.desktop" "$pkgdir/usr/share/applications/stack-pdf-merger.desktop"
   install -d "$pkgdir/usr/bin"

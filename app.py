@@ -8,8 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent, QFont
+from PySide6.QtCore import QObject, Qt, QThread, QUrl, Signal, Slot
+from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent, QFont, QIcon
 from PySide6.QtWidgets import (
     QApplication, QFileDialog, QFrame, QHBoxLayout, QLabel, QListWidget,
     QListWidgetItem, QMainWindow, QMessageBox, QPushButton, QSizePolicy,
@@ -67,10 +67,29 @@ class FileList(QListWidget):
             super().dropEvent(event)
 
 
+class MergeWorker(QObject):
+    completed = Signal(bool, str)
+
+    def __init__(self, paths, output):
+        super().__init__()
+        self.paths = paths
+        self.output = output
+
+    @Slot()
+    def run(self):
+        try:
+            StackWindow.merge_files(self.paths, self.output)
+        except Exception as exc:
+            self.completed.emit(False, str(exc))
+        else:
+            self.completed.emit(True, self.output)
+
+
 class StackWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Stack — PDF merger")
+        self.setWindowIcon(QIcon(str(Path(__file__).with_name("icon.svg"))))
         self.setMinimumSize(680, 700)
         self.resize(760, 800)
         self.setAcceptDrops(True)
@@ -158,10 +177,12 @@ class StackWindow(QMainWindow):
         controls.addWidget(self.merge_button)
         page.addLayout(controls)
         page.addSpacing(20)
-        footer = QLabel("PDFs stay on your device  ·  Drag to reorder  ·  No uploads")
-        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        footer.setStyleSheet(f"font-size:11px; color:{MUTED}; background:transparent;")
-        page.addWidget(footer)
+        self.footer = QLabel("PDFs stay on your device  ·  Drag to reorder  ·  No uploads")
+        self.footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.footer.setStyleSheet(f"font-size:11px; color:{MUTED}; background:transparent;")
+        page.addWidget(self.footer)
+        self.merge_thread = None
+        self.merge_worker = None
         self.update_count()
 
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -223,19 +244,51 @@ class StackWindow(QMainWindow):
         if any(Path(p).resolve() == out.resolve() for p in paths):
             QMessageBox.warning(self, "Choose another destination", "The output file cannot replace one of the PDFs being merged.")
             return
-        self.merge_button.setEnabled(False)
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            self.merge_files(paths, str(out))
-        except Exception as exc:
-            QMessageBox.critical(self, "Could not merge PDFs", str(exc))
-        else:
-            answer = QMessageBox.information(self, "Your PDFs are together", f"Saved {out.name}\n\n{out}", QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Close, QMessageBox.StandardButton.Open)
-            if answer == QMessageBox.StandardButton.Open:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(str(out)))
-        finally:
-            QApplication.restoreOverrideCursor()
-            self.update_count()
+        self._set_busy(True)
+        self.merge_thread = QThread(self)
+        self.merge_worker = MergeWorker(paths, str(out))
+        self.merge_worker.moveToThread(self.merge_thread)
+        self.merge_thread.started.connect(self.merge_worker.run)
+        self.merge_worker.completed.connect(self._merge_completed)
+        self.merge_worker.completed.connect(self.merge_thread.quit)
+        self.merge_worker.completed.connect(self.merge_worker.deleteLater)
+        self.merge_thread.finished.connect(self.merge_thread.deleteLater)
+        self.merge_thread.finished.connect(self._merge_thread_finished)
+        self.merge_thread.start()
+
+    def _set_busy(self, busy):
+        self.add_button.setEnabled(not busy)
+        self.remove_button.setEnabled(not busy and self.files.currentItem() is not None)
+        self.files.setEnabled(not busy)
+        self.merge_button.setEnabled(not busy and self.files.count() >= 2)
+        self.merge_button.setText("Merging…" if busy else "Merge PDFs   →")
+        self.footer.setText("Merging locally · You can keep using your desktop" if busy
+                            else "PDFs stay on your device  ·  Drag to reorder  ·  No uploads")
+
+    def _merge_completed(self, success, detail):
+        self._set_busy(False)
+        if not success:
+            QMessageBox.critical(self, "Could not merge PDFs", detail)
+            return
+        out = Path(detail)
+        answer = QMessageBox.information(
+            self, "Your PDFs are together", f"Saved {out.name}\n\n{out}",
+            QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Close,
+            QMessageBox.StandardButton.Open,
+        )
+        if answer == QMessageBox.StandardButton.Open:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(out)))
+
+    def _merge_thread_finished(self):
+        self.merge_thread = None
+        self.merge_worker = None
+
+    def closeEvent(self, event):
+        if self.merge_thread is not None and self.merge_thread.isRunning():
+            QMessageBox.information(self, "Merge in progress", "Keep Stack open until the local merge finishes.")
+            event.ignore()
+            return
+        super().closeEvent(event)
 
     @staticmethod
     def merge_files(paths, output):
